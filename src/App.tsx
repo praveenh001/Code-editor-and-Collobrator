@@ -1,18 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// App.tsx
+import { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import CodeEditor from './components/CodeEditor';
 import FileExplorer from './components/FileExplorer';
 import Terminal from './components/Terminal';
 import UserList from './components/UserList';
 import RoomManager from './components/RoomManager';
+import LandingPage from './components/LandingPage';
 import useSocket from './hooks/useSocket';
 import { api } from './utils/api';
 import { FileSystemItem, FileItem, FolderItem, User } from './types';
-import { createFile, createFolder, flattenFileSystem } from './utils/fileSystem';
+import { createFile, createFolder, flattenFileSystem, getFileExtension } from './utils/fileSystem';
 
-function App() {
+const MainAppContent = () => {
   // Room state
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>('');
+  const [, setUserName] = useState<string>(''); // first element unused -> avoid "declared but value never read"
   const [isInRoom, setIsInRoom] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,13 +37,19 @@ function App() {
   // Get flattened files for compatibility with existing code
   const files = flattenFileSystem(fileSystem);
 
+  // Supported extensions for loading files
+  const supportedExtensions = new Set([
+    'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'go', 'rs', 'php', 'rb', 'html', 'css', 'json', 'md'
+  ]);
+
   // Socket event handlers
   useEffect(() => {
     if (!socket) return;
 
     // Store socket ID
     socket.on('connect', () => {
-      setCurrentUserId(socket.id);
+      // socket.id can be undefined in type but we keep a string in state
+      setCurrentUserId(socket.id ?? '');
     });
 
     // File synchronization
@@ -255,7 +264,7 @@ function App() {
   const createRoom = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.createRoom();
+      await api.createRoom(); // response wasn't used -> await directly
       // Room creation handled in RoomManager component
     } catch (error) {
       console.error('Failed to create room:', error);
@@ -287,7 +296,7 @@ function App() {
       
     } catch (error) {
       console.error('Failed to join room:', error);
-      setTerminalOutput(prev => [...prev, `❌ Failed to join room: ${error}`]);
+      setTerminalOutput(prev => [...prev, `❌ Failed to join room: ${String(error)}`]);
     } finally {
       setIsLoading(false);
     }
@@ -359,12 +368,62 @@ function App() {
     });
   }, []);
 
+  // Open local folder and upload to room
+  const handleOpenFolder = useCallback(async () => {
+    if (!socket || !roomId) return;
+
+    try {
+      const win: any = window as any;
+      if (!win.showDirectoryPicker) {
+        throw new Error('Directory picker not supported in this browser');
+      }
+      const dirHandle = await win.showDirectoryPicker();
+      await uploadDirectory(dirHandle);
+    } catch (error) {
+      console.error('Failed to open folder:', error);
+      setTerminalOutput(prev => [...prev, `❌ Failed to open folder: ${String(error)}`]);
+    }
+  }, [socket, roomId]);
+
+  const uploadDirectory = async (dirHandle: FileSystemDirectoryHandle, parentPath: string = '') => {
+    if (!socket) return;
+    const folderPath = parentPath ? `${parentPath}/${(dirHandle as any).name}` : (dirHandle as any).name;
+    const folder = createFolder((dirHandle as any).name);
+    socket?.emit('create-folder', { folderName: folderPath, folder, roomId });
+
+    // TypeScript lib may not include values(); cast to any
+    const iterator = (dirHandle as any).values ? (dirHandle as any).values() : (dirHandle as any);
+    for await (const entry of iterator) {
+      // entry usually has 'kind' and 'name'
+      if (entry.kind === 'directory') {
+        await uploadDirectory(entry as FileSystemDirectoryHandle, folderPath);
+      } else if (entry.kind === 'file') {
+        const extension = getFileExtension(entry.name);
+        if (supportedExtensions.has(extension)) {
+          const fileHandle = entry as FileSystemFileHandle;
+          const file = await fileHandle.getFile();
+          let content = '';
+          try {
+            content = await file.text();
+          } catch (e) {
+            console.warn(`Skipping non-text file: ${entry.name}`);
+            continue;
+          }
+          const filePath = `${folderPath}/${entry.name}`;
+          socket?.emit('create-file', { fileName: filePath, content, roomId });
+        } else {
+          console.warn(`Skipping unsupported file type: ${entry.name}`);
+        }
+      }
+    }
+  };
+
   // Code editing
   const handleCodeChange = useCallback((content: string) => {
     if (!currentFile || !socket || !roomId) return;
     
     updateFileInHierarchy(currentFile, content);
-    socket.emit('code-change', { fileName: currentFile, content, roomId });
+    socket?.emit('code-change', { fileName: currentFile, content, roomId });
   }, [currentFile, socket, roomId]);
 
   const handleCursorChange = useCallback((position: any) => {
@@ -384,7 +443,7 @@ function App() {
       const result = await api.executeCode(code, language, roomId);
       setTerminalOutput(prev => [...prev, result.output]);
     } catch (error) {
-      setTerminalOutput(prev => [...prev, `❌ Execution failed: ${error}`]);
+      setTerminalOutput(prev => [...prev, `❌ Execution failed: ${String(error)}`]);
     } finally {
       setIsExecuting(false);
     }
@@ -429,7 +488,7 @@ function App() {
       <header className="bg-white border-b border-gray-200 px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-gray-800">CodeCollab</h1>
+            <h1 className="text-lg font-semibold text-gray-800">CodeSync</h1>
             <div className="text-sm text-gray-500">
               Room: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{roomId}</span>
             </div>
@@ -457,6 +516,7 @@ function App() {
             onItemDelete={handleItemDelete}
             onItemRename={handleItemRename}
             onFolderToggle={handleFolderToggle}
+            onOpenFolder={handleOpenFolder}
           />
         </div>
 
@@ -508,6 +568,17 @@ function App() {
         </div>
       </div>
     </div>
+  );
+};
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/room/*" element={<MainAppContent />} />
+      </Routes>
+    </Router>
   );
 }
 

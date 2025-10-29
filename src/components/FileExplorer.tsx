@@ -1,3 +1,5 @@
+// FileExplorer.tsx
+
 import React, { useState } from 'react';
 import { 
   File, 
@@ -13,7 +15,7 @@ import {
   ChevronRight,
   ChevronDown
 } from 'lucide-react';
-import { FileSystemItem, FileItem, FolderItem } from '../types';
+import { FileSystemItem } from '../types'; // ✅ Removed unused FileItem, FolderItem
 import { downloadFile, downloadFolder, getFileExtension } from '../utils/fileSystem';
 
 interface FileExplorerProps {
@@ -25,6 +27,7 @@ interface FileExplorerProps {
   onItemDelete: (path: string) => void;
   onItemRename: (oldPath: string, newName: string) => void;
   onFolderToggle: (path: string) => void;
+  onOpenFolder: () => void;
 }
 
 const FileExplorer: React.FC<FileExplorerProps> = ({
@@ -35,7 +38,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   onFolderCreate,
   onItemDelete,
   onItemRename,
-  onFolderToggle
+  onFolderToggle,
+  onOpenFolder
 }) => {
   const [showCreateInput, setShowCreateInput] = useState<{ type: 'file' | 'folder', path: string } | null>(null);
   const [newItemName, setNewItemName] = useState('');
@@ -46,8 +50,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   const handleCreateItem = () => {
     if (!showCreateInput || !newItemName.trim()) return;
     
-    const fullPath = showCreateInput.path ? `${showCreateInput.path}/${newItemName.trim()}` : newItemName.trim();
-    
+    // ❌ Removed unused variable 'fullPath'
     if (showCreateInput.type === 'file') {
       onFileCreate(showCreateInput.path, newItemName.trim());
     } else {
@@ -58,21 +61,21 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     setShowCreateInput(null);
   };
 
-  const handleRenameItem = (path: string) => {
-    if (editItemName.trim() && editItemName !== path.split('/').pop()) {
-      onItemRename(path, editItemName.trim());
+  const handleRenameItem = (itemPath: string) => { // ✅ renamed 'path' → 'itemPath' to avoid shadowing
+    if (editItemName.trim() && editItemName !== itemPath.split('/').pop()) {
+      onItemRename(itemPath, editItemName.trim());
     }
     setEditingItem(null);
     setEditItemName('');
   };
 
-  const startRename = (path: string) => {
-    setEditingItem(path);
-    setEditItemName(path.split('/').pop() || '');
+  const startRename = (itemPath: string) => {
+    setEditingItem(itemPath);
+    setEditItemName(itemPath.split('/').pop() || '');
     setShowMenu(null);
   };
 
-  const handleDownload = (path: string, item: FileSystemItem) => {
+  const handleDownload = (itemPath: string, item: FileSystemItem) => {
     if (item.type === 'file') {
       downloadFile(item.name, item.content);
     } else {
@@ -112,13 +115,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     );
   };
 
-  const renderItem = (name: string, item: FileSystemItem, path: string, depth: number = 0) => {
-    const isSelected = currentFile === path;
-    const isEditing = editingItem === path;
+  const renderItem = (name: string, item: FileSystemItem, itemPath: string, depth: number = 0) => { // ✅ renamed 'path' → 'itemPath'
+    const isSelected = currentFile === itemPath;
+    const isEditing = editingItem === itemPath;
     const paddingLeft = depth * 16 + 8;
 
     return (
-      <div key={path}>
+      <div key={itemPath}>
         <div
           className={`flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors group ${
             isSelected && item.type === 'file'
@@ -128,9 +131,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           style={{ paddingLeft: `${paddingLeft}px` }}
           onClick={() => {
             if (item.type === 'file') {
-              onFileSelect(path);
+              onFileSelect(itemPath);
             } else {
-              onFolderToggle(path);
+              onFolderToggle(itemPath);
             }
           }}
         >
@@ -139,7 +142,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onFolderToggle(path);
+                  onFolderToggle(itemPath);
                 }}
                 className="p-0.5 hover:bg-gray-600 rounded"
               >
@@ -168,13 +171,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 onChange={(e) => setEditItemName(e.target.value)}
                 className="flex-1 px-1 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') handleRenameItem(path);
+                  if (e.key === 'Enter') handleRenameItem(itemPath);
                   if (e.key === 'Escape') {
                     setEditingItem(null);
                     setEditItemName('');
                   }
                 }}
-                onBlur={() => handleRenameItem(path)}
+                onBlur={() => handleRenameItem(itemPath)}
                 autoFocus
               />
             ) : (
@@ -185,7 +188,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowMenu(showMenu === path ? null : path);
+              setShowMenu(showMenu === itemPath ? null : itemPath);
             }}
             className="p-1 hover:bg-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
           >
@@ -193,12 +196,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           </button>
         </div>
 
-        {showMenu === path && (
+        {showMenu === itemPath && (
           <div className="absolute right-2 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 z-20 min-w-32">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                startRename(path);
+                startRename(itemPath);
               }}
               className="w-full px-3 py-1 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
             >
@@ -208,7 +211,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleDownload(path, item);
+                handleDownload(itemPath, item);
               }}
               className="w-full px-3 py-1 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
             >
@@ -220,7 +223,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowCreateInput({ type: 'file', path });
+                    setShowCreateInput({ type: 'file', path: itemPath });
                     setShowMenu(null);
                   }}
                   className="w-full px-3 py-1 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
@@ -231,7 +234,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowCreateInput({ type: 'folder', path });
+                    setShowCreateInput({ type: 'folder', path: itemPath });
                     setShowMenu(null);
                   }}
                   className="w-full px-3 py-1 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
@@ -245,7 +248,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 if (confirm(`Are you sure you want to delete "${name}"?`)) {
-                  onItemDelete(path);
+                  onItemDelete(itemPath);
                 }
                 setShowMenu(null);
               }}
@@ -260,7 +263,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
         {item.type === 'folder' && item.expanded && (
           <div>
             {Object.entries(item.children).map(([childName, childItem]) =>
-              renderItem(childName, childItem, `${path}/${childName}`, depth + 1)
+              renderItem(childName, childItem, `${itemPath}/${childName}`, depth + 1)
             )}
           </div>
         )}
@@ -286,6 +289,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
             title="Create new folder"
           >
             <FolderPlus className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onOpenFolder}
+            className="p-1 hover:bg-gray-700 rounded transition-colors"
+            title="Open local folder"
+          >
+            <FolderOpen className="w-4 h-4" />
           </button>
         </div>
       </div>
