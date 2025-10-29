@@ -210,22 +210,40 @@ const MainAppContent = () => {
 
   const removeItemFromHierarchy = (path: string) => {
     setFileSystem(prev => {
-      const newFileSystem = { ...prev };
+      const newFileSystem = JSON.parse(JSON.stringify(prev)); // deep copy
       const parts = path.split('/');
       let current: any = newFileSystem;
-      
-      for (let i = 0; i < parts.length - 1; i++) {
-        current = current[parts[i]].children;
+
+      try {
+        // Navigate to parent
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!current[parts[i]] || !current[parts[i]].children) {
+            console.warn(`Path not found: ${parts.slice(0, i + 1).join('/')}`);
+            return prev;
+          }
+          current = current[parts[i]].children;
+        }
+
+        // Delete the item
+        const itemName = parts[parts.length - 1];
+        if (current[itemName]) {
+          delete current[itemName];
+        } else {
+          console.warn(`Item not found: ${path}`);
+          return prev;
+        }
+
+        // Update current file if deleted
+        if (currentFile && (currentFile === path || currentFile.startsWith(path + '/'))) {
+          const remainingFiles = Object.keys(flattenFileSystem(newFileSystem));
+          setCurrentFile(remainingFiles.length > 0 ? remainingFiles[0] : null);
+        }
+
+        return newFileSystem;
+      } catch (error) {
+        console.error('Error removing item from hierarchy:', error);
+        return prev;
       }
-      
-      delete current[parts[parts.length - 1]];
-      
-      if (currentFile === path) {
-        const remainingFiles = Object.keys(flattenFileSystem(newFileSystem));
-        setCurrentFile(remainingFiles.length > 0 ? remainingFiles[0] : null);
-      }
-      
-      return newFileSystem;
     });
   };
 
@@ -334,9 +352,13 @@ const MainAppContent = () => {
   }, [socket, roomId]);
 
   const handleItemDelete = useCallback((path: string) => {
-    if (!socket || !roomId) return;
-    
-    socket.emit('delete-item', { path, roomId });
+    // Delete locally first
+    removeItemFromHierarchy(path);
+
+    // Sync with room if connected
+    if (socket && roomId) {
+      socket.emit('delete-item', { path, roomId });
+    }
   }, [socket, roomId]);
 
   const handleItemRename = useCallback((oldPath: string, newName: string) => {
