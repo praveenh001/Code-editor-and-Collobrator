@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: codecollaborator-frontend
+    name: codecollob
     env: static
     staticPublishPath: dist
     buildCommand: npm run build
