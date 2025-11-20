@@ -28,6 +28,9 @@ const MainAppContent = () => {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
 
+  // Host persistent state
+  const [hostId, setHostId] = useState<string>("");
+
   // File system
   const [fileSystem, setFileSystem] = useState<{ [key: string]: FileSystemItem }>({});
   const [currentFile, setCurrentFile] = useState<string | null>(null);
@@ -43,7 +46,7 @@ const MainAppContent = () => {
   const { socket, isConnected, error } = useSocket();
   const files = flattenFileSystem(fileSystem);
 
-  // --- Detect tab reload (refresh protection) ---
+  // --- Detect tab reload ---
   useEffect(() => {
     const beforeUnload = () => {
       sessionStorage.setItem("codesync-reloading", "true");
@@ -53,7 +56,7 @@ const MainAppContent = () => {
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, []);
 
-  // --- Auto rejoin logic (uses sessionStorage for per-tab sessions) ---
+  // --- Auto rejoin logic ---
   useEffect(() => {
     const savedRoomId = sessionStorage.getItem("codesync-room");
     const savedUser = sessionStorage.getItem("codesync-user");
@@ -90,51 +93,61 @@ const MainAppContent = () => {
 
     socket.on("files-sync", (syncedFiles: { [key: string]: FileItem }) => {
       const hierarchical: { [key: string]: FileSystemItem } = {};
+
       Object.entries(syncedFiles).forEach(([path, file]) => {
         const parts = path.split("/");
         let current = hierarchical;
+
         for (let i = 0; i < parts.length - 1; i++) {
           const part = parts[i];
           if (!current[part]) current[part] = createFolder(part);
           current = (current[part] as FolderItem).children;
         }
+
         current[parts[parts.length - 1]] = file;
       });
+
       setFileSystem(hierarchical);
+
       if (Object.keys(syncedFiles).length > 0 && !currentFile) {
         setCurrentFile(Object.keys(syncedFiles)[0]);
       }
     });
 
-    socket.on("code-update", ({ fileName, content }) =>
-      updateFileInHierarchy(fileName, content)
-    );
-    socket.on("file-created", ({ fileName, file }) =>
-      addFileToHierarchy(fileName, file)
-    );
-    socket.on("folder-created", ({ folderName, folder }) =>
-      addFolderToHierarchy(folderName, folder)
-    );
-    socket.on("item-deleted", ({ path }) => removeItemFromHierarchy(path));
-    socket.on("item-renamed", ({ oldPath, newPath }) =>
-      renameItemInHierarchy(oldPath, newPath)
-    );
+    // Receive updated user list + hostId
+    socket.on("users-list", ({ users: list, hostId }) => {
+      setUsers(list);
+      setHostId(hostId);
+    });
 
-    socket.on("users-list", (list: User[]) => setUsers(list));
-
-    socket.on("user-joined", ({ user, users: updatedUsers }) => {
+    socket.on("user-joined", ({ user, users: updatedUsers, hostId }) => {
       setUsers(updatedUsers);
+      setHostId(hostId);
       setTerminalOutput((p) => [...p, `👋 ${user.name} joined the room`]);
     });
 
-    socket.on("user-left", ({ userId, users: updatedUsers }) => {
-      setUsers((prevUsers) => {
-        const leftUser = prevUsers.find((u) => u.id === userId);
-        if (leftUser)
-          setTerminalOutput((p) => [...p, `👋 ${leftUser.name} left the room`]);
-        return updatedUsers;
-      });
+    socket.on("user-left", ({ userId, users: updatedUsers, hostId }) => {
+      setUsers(updatedUsers);
+      setHostId(hostId);
     });
+
+    socket.on("code-update", ({ fileName, content }) =>
+      updateFileInHierarchy(fileName, content)
+    );
+
+    socket.on("file-created", ({ fileName, file }) =>
+      addFileToHierarchy(fileName, file)
+    );
+
+    socket.on("folder-created", ({ folderName, folder }) =>
+      addFolderToHierarchy(folderName, folder)
+    );
+
+    socket.on("item-deleted", ({ path }) => removeItemFromHierarchy(path));
+
+    socket.on("item-renamed", ({ oldPath, newPath }) =>
+      renameItemInHierarchy(oldPath, newPath)
+    );
 
     socket.on("code-executed", ({ output }) => {
       setTerminalOutput((p) => [...p, "> Code executed by another user:", output]);
@@ -151,17 +164,21 @@ const MainAppContent = () => {
     };
   }, [socket]);
 
-  // --- File system helpers ---
+  // File system helpers
   const updateFileInHierarchy = (path: string, content: string) => {
     setFileSystem((prev) => {
       const newFS = { ...prev };
       const parts = path.split("/");
       let current: any = newFS;
-      for (let i = 0; i < parts.length - 1; i++) current = current[parts[i]].children;
+
+      for (let i = 0; i < parts.length - 1; i++)
+        current = current[parts[i]].children;
+
       const name = parts[parts.length - 1];
       if (current[name]?.type === "file") {
         current[name] = { ...current[name], content };
       }
+
       return newFS;
     });
   };
@@ -171,11 +188,13 @@ const MainAppContent = () => {
       const newFS = { ...prev };
       const parts = path.split("/");
       let current: any = newFS;
+
       for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
         if (!current[part]) current[part] = createFolder(part);
         current = current[part].children;
       }
+
       current[parts[parts.length - 1]] = file;
       return newFS;
     });
@@ -186,11 +205,13 @@ const MainAppContent = () => {
       const newFS = { ...prev };
       const parts = path.split("/");
       let current: any = newFS;
+
       for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
         if (!current[part]) current[part] = createFolder(part);
         current = current[part].children;
       }
+
       current[parts[parts.length - 1]] = folder;
       return newFS;
     });
@@ -201,7 +222,12 @@ const MainAppContent = () => {
       const newFS = JSON.parse(JSON.stringify(prev));
       const parts = path.split("/");
       let current: any = newFS;
-      for (let i = 0; i < parts.length - 1; i++) current = current[parts[i]].children;
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current[parts[i]]?.children;
+        if (!current) return newFS;
+      }
+
       delete current[parts[parts.length - 1]];
       return newFS;
     });
@@ -210,19 +236,27 @@ const MainAppContent = () => {
   const renameItemInHierarchy = (oldPath: string, newPath: string) => {
     setFileSystem((prev) => {
       const newFS = { ...prev };
+
       const oldParts = oldPath.split("/");
       let oldCurrent: any = newFS;
-      for (let i = 0; i < oldParts.length - 1; i++)
+
+      for (let i = 0; i < oldParts.length - 1; i++) {
         oldCurrent = oldCurrent[oldParts[i]].children;
+      }
+
       const item = oldCurrent[oldParts[oldParts.length - 1]];
       const newParts = newPath.split("/");
       let newCurrent: any = newFS;
-      for (let i = 0; i < newParts.length - 1; i++)
+
+      for (let i = 0; i < newParts.length - 1; i++) {
         newCurrent = newCurrent[newParts[i]].children;
+      }
+
       newCurrent[newParts[newParts.length - 1]] = {
         ...item,
         name: newParts[newParts.length - 1],
       };
+
       delete oldCurrent[oldParts[oldParts.length - 1]];
       return newFS;
     });
@@ -243,6 +277,7 @@ const MainAppContent = () => {
   const joinRoom = useCallback(
     async (rId: string, uName: string) => {
       if (!socket) return;
+
       setIsLoading(true);
       try {
         const check = await api.checkRoom(rId);
@@ -250,14 +285,17 @@ const MainAppContent = () => {
           setTerminalOutput((p) => [...p, `❌ Room ${rId} not found`]);
           return;
         }
+
         socket.emit("join-room", { roomId: rId, userName: uName });
         setRoomId(rId);
         setUserName(uName);
         setIsInRoom(true);
+
         setTerminalOutput([
           `🚀 Welcome to room ${rId}!`,
           `📝 You can start coding now...`,
         ]);
+
         sessionStorage.setItem("codesync-room", rId);
         sessionStorage.setItem("codesync-user", uName);
       } catch (err) {
@@ -269,14 +307,16 @@ const MainAppContent = () => {
     [socket]
   );
 
-  // --- Leave Room ---
   const leaveRoom = useCallback(() => {
-    if (socket && roomId && !isReloading) socket.emit("leave-room", { roomId });
+    if (socket && roomId && !isReloading)
+      socket.emit("leave-room", { roomId });
+
     sessionStorage.removeItem("codesync-room");
     sessionStorage.removeItem("codesync-user");
     sessionStorage.removeItem("codesync-session-active");
 
     setIsLeaving(true);
+
     setTimeout(() => {
       setIsInRoom(false);
       setRoomId(null);
@@ -294,7 +334,9 @@ const MainAppContent = () => {
   const handleCodeChange = useCallback(
     (content: string) => {
       if (!currentFile || !socket || !roomId) return;
+
       updateFileInHierarchy(currentFile, content);
+
       socket.emit("code-change", { fileName: currentFile, content, roomId });
     },
     [currentFile, socket, roomId]
@@ -302,7 +344,8 @@ const MainAppContent = () => {
 
   const handleCursorChange = useCallback(
     (pos: any) => {
-      if (socket && roomId) socket.emit("cursor-change", { position: pos, roomId });
+      if (socket && roomId)
+        socket.emit("cursor-change", { position: pos, roomId });
     },
     [socket, roomId]
   );
@@ -310,8 +353,10 @@ const MainAppContent = () => {
   const handleCodeExecute = useCallback(
     async (code: string, language: string) => {
       if (!roomId) return;
+
       setIsExecuting(true);
       setTerminalOutput((p) => [...p, `> Executing ${language} code...`]);
+
       try {
         const result = await api.executeCode(code, language, roomId);
         setTerminalOutput((p) => [...p, result.output]);
@@ -324,7 +369,7 @@ const MainAppContent = () => {
     [roomId]
   );
 
-  // --- Error UI ---
+  // --- If socket error ---
   if (error) {
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
@@ -357,14 +402,10 @@ const MainAppContent = () => {
     );
   }
 
-  // --- Main UI ---
   return (
     <div
-      className={`h-screen flex flex-col bg-gray-100 relative ${
-        isLeaving
-          ? "opacity-0 transition-opacity duration-700"
-          : "opacity-100 transition-opacity duration-700"
-      }`}
+      className={`h-screen flex flex-col bg-gray-100 relative ${isLeaving ? "opacity-0 transition-opacity duration-700" : "opacity-100"
+        }`}
     >
       <header className="bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center">
         <div className="flex items-center gap-4">
@@ -376,17 +417,22 @@ const MainAppContent = () => {
             </span>
           </span>
         </div>
+
         <div className="flex items-center gap-3">
+          {currentUserId === hostId && (
+            <span className="text-yellow-600 font-semibold">⭐ Host</span>
+          )}
+
           <button
             onClick={leaveRoom}
             className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded transition-colors"
           >
             Leave Room
           </button>
+
           <div
-            className={`w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
+            className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
           />
           <span className="text-sm text-gray-600">
             {isConnected ? "Connected" : "Disconnected"}
@@ -395,7 +441,6 @@ const MainAppContent = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* File Explorer */}
         <div className="w-64 border-r border-gray-300">
           <FileExplorer
             items={fileSystem}
@@ -426,12 +471,11 @@ const MainAppContent = () => {
                 roomId,
               });
             }}
-            onFolderToggle={() => {}}
-            onOpenFolder={() => {}}
+            onFolderToggle={() => { }}
+            onOpenFolder={() => { }}
           />
         </div>
 
-        {/* Code Editor */}
         <div className="flex-1 flex flex-col">
           {currentFile && files[currentFile] ? (
             <>
@@ -439,6 +483,7 @@ const MainAppContent = () => {
                 <span className="text-sm font-medium">{currentFile}</span>
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
               </div>
+
               <div className="flex-1">
                 <CodeEditor
                   fileName={currentFile}
@@ -453,15 +498,12 @@ const MainAppContent = () => {
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">
                 <p className="text-lg mb-2">No file selected</p>
-                <p className="text-sm">
-                  Create or select a file from the explorer
-                </p>
+                <p className="text-sm">Create or select a file from the explorer</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Terminal + Users */}
         <div className="w-80 flex flex-col border-l border-gray-300">
           <div className="flex-1 border-b border-gray-300">
             <Terminal
@@ -472,8 +514,16 @@ const MainAppContent = () => {
               files={files}
             />
           </div>
+
           <div className="h-64">
-            <UserList users={users} currentUserId={currentUserId} />
+            <UserList
+              users={[...users].sort((a, b) =>
+                a.id === hostId ? -1 : b.id === hostId ? 1 : 0
+              )}
+              currentUserId={currentUserId}
+              hostId={hostId}
+            />
+
           </div>
         </div>
       </div>
@@ -487,7 +537,6 @@ const MainAppContent = () => {
   );
 };
 
-// --- Router Wrapper ---
 function App() {
   return (
     <Router>

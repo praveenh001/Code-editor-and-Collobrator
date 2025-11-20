@@ -1,14 +1,14 @@
 // FileExplorer.tsx
 
 import React, { useState } from 'react';
-import { 
-  File, 
-  Folder, 
+import {
+  File,
+  Folder,
   FolderOpen,
-  Plus, 
-  MoreHorizontal, 
-  Trash2, 
-  Edit, 
+  Plus,
+  MoreHorizontal,
+  Trash2,
+  Edit,
   FileText,
   Download,
   FolderPlus,
@@ -49,14 +49,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
 
   const handleCreateItem = () => {
     if (!showCreateInput || !newItemName.trim()) return;
-    
+
     // ❌ Removed unused variable 'fullPath'
     if (showCreateInput.type === 'file') {
       onFileCreate(showCreateInput.path, newItemName.trim());
     } else {
       onFolderCreate(showCreateInput.path, newItemName.trim());
     }
-    
+
     setNewItemName('');
     setShowCreateInput(null);
   };
@@ -86,7 +86,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
 
   const getFileIcon = (fileName: string) => {
     const extension = getFileExtension(fileName);
-    
+
     const iconMap: { [key: string]: { icon: React.ReactNode, color: string } } = {
       'js': { icon: <FileText className="w-4 h-4" />, color: 'text-yellow-400' },
       'jsx': { icon: <FileText className="w-4 h-4" />, color: 'text-blue-400' },
@@ -105,9 +105,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       'json': { icon: <FileText className="w-4 h-4" />, color: 'text-green-400' },
       'md': { icon: <FileText className="w-4 h-4" />, color: 'text-gray-400' }
     };
-    
+
     const iconData = iconMap[extension] || { icon: <File className="w-4 h-4" />, color: 'text-gray-400' };
-    
+
     return (
       <span className={iconData.color}>
         {iconData.icon}
@@ -123,11 +123,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     return (
       <div key={itemPath}>
         <div
-          className={`flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors group ${
-            isSelected && item.type === 'file'
+          className={`flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors group ${isSelected && item.type === 'file'
               ? 'bg-blue-600 text-white'
               : 'hover:bg-gray-700'
-          }`}
+            }`}
           style={{ paddingLeft: `${paddingLeft}px` }}
           onClick={() => {
             if (item.type === 'file') {
@@ -153,7 +152,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 )}
               </button>
             )}
-            
+
             {item.type === 'folder' ? (
               item.expanded ? (
                 <FolderOpen className="w-4 h-4 text-blue-400" />
@@ -163,7 +162,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
             ) : (
               getFileIcon(name)
             )}
-            
+
             {isEditing ? (
               <input
                 type="text"
@@ -184,7 +183,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
               <span className="text-sm truncate">{name}</span>
             )}
           </div>
-          
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -353,6 +352,18 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           <p className="text-xs">Click + to create one</p>
         </div>
       )}
+
+      {/* Room Features Section */}
+      <div className="mt-6 p-3 bg-gray-800 rounded-lg absolute bottom-4 left-4 right-4">
+        <h4 className="text-xs font-semibold text-gray-300 mb-2">Room Features</h4>
+        <div className="text-xs text-gray-400 space-y-1">
+          <p>✨ Real-time collaboration</p>
+          <p>📁 Shared file system</p>
+          <p>⚡ Code execution</p>
+          <p>💬 Live cursors</p>
+        </div>
+      </div>
+
     </div>
   );
 };
