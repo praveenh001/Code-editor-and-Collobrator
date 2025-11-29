@@ -1,10 +1,12 @@
 // LandingPage.tsx - COMPLETE CODE WITH UPDATED FOOTER
 import React, { useState, useEffect } from 'react';
-import { 
-  Code, 
-  Users, 
-  Zap, 
-  Play, 
+import { useNavigate } from "react-router-dom";
+
+import {
+  Code,
+  Users,
+  Zap,
+  Play,
   ArrowRight,
   Github,
   Linkedin,
@@ -14,6 +16,8 @@ import {
 
 const LandingPage: React.FC = () => {
   const [showFeatures, setShowFeatures] = useState(false);
+  
+
   const [showStats, setShowStats] = useState(false);
 
   useEffect(() => {
@@ -26,14 +30,17 @@ const LandingPage: React.FC = () => {
   }, []);
 
   const scrollToFeatures = () => {
-    document.getElementById('features')?.scrollIntoView({ 
-      behavior: 'smooth' 
+    document.getElementById('features')?.scrollIntoView({
+      behavior: 'smooth'
     });
   };
 
+  const navigate = useNavigate();
+
   const handleGetStarted = () => {
-    window.location.href = '/room';
+    navigate('/room');
   };
+
 
   const BackgroundWithOverlay = () => (
     <div className="fixed inset-0 -z-10 overflow-hidden">
@@ -84,8 +91,8 @@ const LandingPage: React.FC = () => {
             <div className="relative">
               <Code className="w-8 h-8 text-white" />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-              <div className="absolute -top-1 -left-1 w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
+              <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+              <div className="absolute -top-1 -left-1 w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
             </div>
           </div>
           <div className="absolute -top-2 -right-2 w-6 h-6 border-t-2 border-r-2 border-cyan-400/50 rounded-tr-lg"></div>
@@ -118,7 +125,7 @@ const LandingPage: React.FC = () => {
               <div className="inline-flex items-center px-4 py-2 bg-cyan-500/10 rounded-full text-cyan-400 text-sm font-semibold">
                 🚀 Real-time Collaboration
               </div>
-              
+
               <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
                 <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                   Code Together,
@@ -128,9 +135,9 @@ const LandingPage: React.FC = () => {
                   Live.
                 </span>
               </h1>
-              
+
               <p className="text-xl text-gray-300 max-w-lg">
-                Transform your coding sessions with real-time collaboration. 
+                Transform your coding sessions with real-time collaboration.
                 Write, execute, and debug code together - instantly.
               </p>
 
@@ -282,14 +289,14 @@ const LandingPage: React.FC = () => {
               </div>
               <span className="text-gray-400">CodeSync © 2025</span>
             </div>
-            
+
             {/* Center - Developed By (NEW!) */}
             <div className="text-center">
               <span className="text-cyan-400 text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
                 Developed by Praveen H
               </span>
             </div>
-            
+
             {/* Right - Social Links */}
             <div className="flex items-center space-x-6">
               <a href="https://github.com/praveenh001" className="text-gray-400 hover:text-white transition-colors">
