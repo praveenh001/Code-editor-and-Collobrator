@@ -16,7 +16,7 @@ const io = socketIo(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://codecollob-frontend.onrender.com"  // ⭐ Your Render frontend URL
+      "https://codesync-1-0.onrender.com"  // ⭐ Your Render frontend URL
     ],
     methods: ["GET", "POST"],
     credentials: true,
@@ -27,7 +27,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://codecollob-frontend.onrender.com"
+      "https://codesync-1-0.onrender.com"
     ],
     credentials: true,
   })
