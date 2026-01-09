@@ -159,26 +159,24 @@ const LandingPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className={`grid grid-cols-3 gap-8 transition-all duration-700 ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                <div className="text-center">
-                  <div className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                    50K+
-                  </div>
-                  <div className="text-gray-400 text-sm">Users</div>
+                            <div
+                className={`flex flex-wrap gap-6 items-center transition-all duration-700 ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                  }`}
+              >
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 border border-gray-700 rounded-full text-sm text-gray-300">
+                  ⚡ Real-time Sync
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                    10K+
-                  </div>
-                  <div className="text-gray-400 text-sm">Rooms Created</div>
+
+
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 border border-gray-700 rounded-full text-sm text-gray-300">
+                  ▶ Live Code Execution
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    99.9%
-                  </div>
-                  <div className="text-gray-400 text-sm">Uptime</div>
+
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 border border-gray-700 rounded-full text-sm text-gray-300">
+                  📁 Shared File System
                 </div>
               </div>
+
             </div>
 
             <div className="relative">
