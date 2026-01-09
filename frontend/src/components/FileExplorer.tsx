@@ -360,7 +360,6 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           <p>✨ Real-time collaboration</p>
           <p>📁 Shared file system</p>
           <p>⚡ Code execution</p>
-          <p>💬 Live cursors</p>
         </div>
       </div>
 
