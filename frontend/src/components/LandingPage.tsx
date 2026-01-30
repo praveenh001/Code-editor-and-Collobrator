@@ -285,7 +285,7 @@ const LandingPage: React.FC = () => {
               <div className="w-6 h-6 bg-gradient-to-br from-cyan-500 to-blue-600 rounded flex items-center justify-center">
                 <Code className="w-3 h-3 text-white" />
               </div>
-              <span className="text-gray-400">CodeSync © 2025</span>
+              <span className="text-gray-400">CodeSync © 2026</span>
             </div>
 
             {/* Center - Developed By (NEW!) */}
