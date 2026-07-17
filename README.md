@@ -1,5 +1,5 @@
 
-# 🚀 CodeSync – Real-Time Collaborative Code Editor
+# CodeSync – Real-Time Collaborative Code Editor
 
 A full-stack, real-time collaborative coding platform built using **React + Vite**, **Node.js**, **Express**, **Socket.IO**, and the **Monaco Editor**, with features like shared file system, code execution, and room-based collaboration.
 
