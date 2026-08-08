@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Remote Cursor Indicators for Monaco Editor */
+.remote-cursor {
+  border-left: 2px solid #3b82f6;
+  margin-left: -1px;
+  position: absolute;
+  height: 19px;
+}

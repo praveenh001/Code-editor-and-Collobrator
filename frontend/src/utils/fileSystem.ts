@@ -1,4 +1,5 @@
 import { FileSystemItem, FileItem, FolderItem } from '../types';
+import JSZip from 'jszip';
 
 export const createFile = (name: string, content: string = ''): FileItem => ({
   name,
@@ -91,7 +92,6 @@ export const downloadFile = (fileName: string, content: string) => {
 };
 
 export const downloadFolder = (folderName: string, items: { [key: string]: FileSystemItem }) => {
-  const JSZip = require('jszip');
   const zip = new JSZip();
   
   const addToZip = (items: { [key: string]: FileSystemItem }, folder: any) => {

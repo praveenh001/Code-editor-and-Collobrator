@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Play, Loader, Download } from 'lucide-react';
+import { Terminal as TerminalIcon, Play, Loader, Download, Trash2 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, LanguageKey } from '../types';
 import { getFileExtension, getLanguageFromExtension } from '../utils/fileSystem';
 
@@ -9,6 +9,7 @@ interface TerminalProps {
   onExecute: (code: string, language: string) => void;
   currentFile: string | null;
   files: { [key: string]: any };
+  onClear?: () => void;
 }
 
 const Terminal: React.FC<TerminalProps> = ({
@@ -16,7 +17,8 @@ const Terminal: React.FC<TerminalProps> = ({
   isExecuting,
   onExecute,
   currentFile,
-  files
+  files,
+  onClear
 }) => {
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -69,9 +71,9 @@ const Terminal: React.FC<TerminalProps> = ({
   };
 
   const clearOutput = () => {
-    // This would need to be implemented in the parent component
-    // For now, we'll just show a message
-    console.log('Clear output functionality needs to be implemented in parent');
+    if (onClear) {
+      onClear();
+    }
   };
 
   const languageInfo = getLanguageInfo(currentFile || '');
@@ -99,6 +101,15 @@ const Terminal: React.FC<TerminalProps> = ({
             title="Download output"
           >
             <Download className="w-3 h-3" />
+          </button>
+
+          <button
+            onClick={clearOutput}
+            disabled={output.length === 0}
+            className="p-1 hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Clear output"
+          >
+            <Trash2 className="w-3 h-3" />
           </button>
           
           <button

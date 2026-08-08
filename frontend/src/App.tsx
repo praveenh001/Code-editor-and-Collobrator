@@ -16,6 +16,7 @@ import useSocket from "./hooks/useSocket";
 import { api } from "./utils/api";
 import { FileSystemItem, FileItem, FolderItem, User } from "./types";
 import { createFolder, flattenFileSystem } from "./utils/fileSystem";
+import RoomChat, { ChatMessage } from "./components/RoomChat";
 
 const MainAppContent = () => {
   const navigate = useNavigate();
@@ -42,6 +43,17 @@ const MainAppContent = () => {
   // Terminal
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+
+  // Remote Cursors
+  const [remoteCursors, setRemoteCursors] = useState<{
+    [userId: string]: { userName: string; position: { lineNumber: number; column: number }; fileName: string };
+  }>({});
+
+  // Theme selector
+  const [theme, setTheme] = useState<string>("vs-dark");
+
+  // Chat messages
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const { socket, isConnected, error } = useSocket();
   const files = flattenFileSystem(fileSystem);
@@ -129,6 +141,11 @@ const MainAppContent = () => {
     socket.on("user-left", ({ userId, users: updatedUsers, hostId }) => {
       setUsers(updatedUsers);
       setHostId(hostId);
+      setRemoteCursors((prev) => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
     });
 
     socket.on("code-update", ({ fileName, content }) =>
@@ -157,6 +174,34 @@ const MainAppContent = () => {
     socket.on("error", ({ message }) => {
       console.error("Socket error:", message);
       setTerminalOutput((p) => [...p, `❌ Error: ${message}`]);
+    });
+
+    socket.on("kicked", ({ message }) => {
+      alert(message);
+      sessionStorage.removeItem("codesync-room");
+      sessionStorage.removeItem("codesync-user");
+      sessionStorage.removeItem("codesync-session-active");
+      setIsInRoom(false);
+      setRoomId(null);
+      setUserName("");
+      setUsers([]);
+      setFileSystem({});
+      setCurrentFile(null);
+      setTerminalOutput(["❌ You were kicked from the room by the host."]);
+      setRemoteCursors({});
+      setChatMessages([]);
+      navigate("/");
+    });
+
+    socket.on("cursor-update", ({ userId, userName, position, fileName }) => {
+      setRemoteCursors((prev) => ({
+        ...prev,
+        [userId]: { userName, position, fileName },
+      }));
+    });
+
+    socket.on("chat-message-receive", (msg: ChatMessage) => {
+      setChatMessages((p) => [...p, msg]);
     });
 
     return () => {
@@ -262,6 +307,25 @@ const MainAppContent = () => {
     });
   };
 
+  const toggleFolderInHierarchy = (path: string) => {
+    setFileSystem((prev) => {
+      const newFS = JSON.parse(JSON.stringify(prev));
+      const parts = path.split("/");
+      let current: any = newFS;
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current[parts[i]].children;
+      }
+
+      const name = parts[parts.length - 1];
+      if (current[name] && current[name].type === "folder") {
+        current[name].expanded = !current[name].expanded;
+      }
+
+      return newFS;
+    });
+  };
+
   // --- Room actions ---
   const createRoom = useCallback(async () => {
     setIsLoading(true);
@@ -325,10 +389,27 @@ const MainAppContent = () => {
       setFileSystem({});
       setCurrentFile(null);
       setTerminalOutput(["👋 You left the room."]);
+      setRemoteCursors({});
+      setChatMessages([]);
       navigate("/");
       setIsLeaving(false);
     }, 800);
   }, [socket, roomId, navigate, isReloading]);
+
+  const handleKickUser = useCallback((userId: string) => {
+    if (socket && roomId) {
+      socket.emit("kick-user", { targetUserId: userId, roomId });
+    }
+  }, [socket, roomId]);
+
+  const handleSendMessage = useCallback(
+    (msgText: string) => {
+      if (socket && roomId) {
+        socket.emit("send-chat-message", { message: msgText, roomId });
+      }
+    },
+    [socket, roomId]
+  );
 
   // --- Code handling ---
   const handleCodeChange = useCallback(
@@ -344,10 +425,10 @@ const MainAppContent = () => {
 
   const handleCursorChange = useCallback(
     (pos: any) => {
-      if (socket && roomId)
-        socket.emit("cursor-change", { position: pos, roomId });
+      if (socket && roomId && currentFile)
+        socket.emit("cursor-change", { position: pos, roomId, fileName: currentFile });
     },
-    [socket, roomId]
+    [socket, roomId, currentFile]
   );
 
   const handleCodeExecute = useCallback(
@@ -423,6 +504,17 @@ const MainAppContent = () => {
             <span className="text-yellow-600 font-semibold">⭐ Host</span>
           )}
 
+          <select
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+            className="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            title="Select editor theme"
+          >
+            <option value="vs-dark">VS Dark</option>
+            <option value="light">Light</option>
+            <option value="hc-black">High Contrast</option>
+          </select>
+
           <button
             onClick={leaveRoom}
             className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded transition-colors"
@@ -471,7 +563,7 @@ const MainAppContent = () => {
                 roomId,
               });
             }}
-            onFolderToggle={() => { }}
+            onFolderToggle={toggleFolderInHierarchy}
             onOpenFolder={() => { }}
           />
         </div>
@@ -491,6 +583,8 @@ const MainAppContent = () => {
                   language="javascript"
                   onChange={handleCodeChange}
                   onCursorChange={handleCursorChange}
+                  remoteCursors={remoteCursors}
+                  theme={theme}
                 />
               </div>
             </>
@@ -512,16 +606,26 @@ const MainAppContent = () => {
               onExecute={handleCodeExecute}
               currentFile={currentFile}
               files={files}
+              onClear={() => setTerminalOutput([])}
             />
           </div>
 
-          <div className="h-64">
+          <div className="h-64 border-b border-gray-300">
+            <RoomChat
+              messages={chatMessages}
+              onSendMessage={handleSendMessage}
+              currentUserId={currentUserId}
+            />
+          </div>
+
+          <div className="h-48">
             <UserList
               users={[...users].sort((a, b) =>
                 a.id === hostId ? -1 : b.id === hostId ? 1 : 0
               )}
               currentUserId={currentUserId}
               hostId={hostId}
+              onKickUser={handleKickUser}
             />
 
           </div>

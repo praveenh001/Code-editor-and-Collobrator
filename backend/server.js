@@ -283,6 +283,32 @@ io.on("connection", (socket) => {
     if (room.users.length === 0) startRoomCleanup(roomId);
   });
 
+  // Kick user
+  socket.on("kick-user", ({ targetUserId, roomId }) => {
+    if (!rooms.has(roomId)) return;
+    const room = rooms.get(roomId);
+
+    // Only host can kick users
+    if (socket.id === room.hostId) {
+      const targetSocket = io.sockets.sockets.get(targetUserId);
+      if (targetSocket) {
+        targetSocket.emit("kicked", { message: "You have been kicked by the host." });
+        targetSocket.leave(roomId);
+      }
+
+      // Update room users list
+      room.users = room.users.filter((u) => u.id !== targetUserId);
+
+      io.to(roomId).emit("user-left", {
+        userId: targetUserId,
+        users: room.users,
+        hostId: room.hostId,
+      });
+
+      if (room.users.length === 0) startRoomCleanup(roomId);
+    }
+  });
+
   // Code change
   socket.on("code-change", ({ fileName, content, roomId }) => {
     if (!roomFileSystem.has(roomId)) roomFileSystem.set(roomId, {});
@@ -292,11 +318,22 @@ io.on("connection", (socket) => {
   });
 
   // Cursor change
-  socket.on("cursor-change", ({ position, roomId }) => {
+  socket.on("cursor-change", ({ position, roomId, fileName }) => {
     socket.to(roomId).emit("cursor-update", {
       userId: socket.id,
       userName: socket.userName,
       position,
+      fileName,
+    });
+  });
+
+  // Chat message
+  socket.on("send-chat-message", ({ message, roomId }) => {
+    io.to(roomId).emit("chat-message-receive", {
+      userId: socket.id,
+      userName: socket.userName,
+      message,
+      timestamp: new Date()
     });
   });
 
